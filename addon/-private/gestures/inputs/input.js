@@ -40,8 +40,8 @@ export default class Input {
     streams.push(stream);
     // console.log('opening new stream');
     let streamEvent = stream.open({
-      x: event.clientX,
-      y: event.clientY,
+      x: event.clientX || event.pageX,
+      y: event.clientY || event.pageY,
       event
     });
 
@@ -75,8 +75,8 @@ export default class Input {
       }
       // console.log('closing stream');
       streamEvent = stream.close({
-        x: event.clientX,
-        y: event.clientY,
+        x: event.clientX || event.pageX,
+        y: event.clientY || event.pageY,
         event
       });
 
@@ -97,8 +97,8 @@ export default class Input {
 
     } else {
       streamEvent = stream.push({
-        x: event.clientX,
-        y: event.clientY,
+        x: event.clientX || event.pageX,
+        y: event.clientY || event.pageY,
         event
       });
 
