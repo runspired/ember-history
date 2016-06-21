@@ -34,11 +34,11 @@ export default class Manager {
     this.inputs[name] = new InputClass(this.rootElement, this);
   }
 
-  recognize(input, streams, streamEvent) {
+  recognize(input, stream, streamEvent) {
     let layer = this._findParentLayer(streamEvent.element);
 
     while (layer) {
-      if (layer.recognize(input, streams, streamEvent)) {
+      if (layer.recognize(input, stream, streamEvent)) {
         this.startInputRecognition();
         break;
       }
@@ -121,8 +121,8 @@ export default class Manager {
   }
 
   _teardown() {
-    this.streams.touch.destroy();
-    this.streams.mouse.destroy();
+    // this.streams.touch.destroy();
+    // this.streams.mouse.destroy();
 
     this.layers.forEach((layer) => {
       layer.destroy();

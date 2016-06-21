@@ -124,7 +124,7 @@ export default Component.extend({
 
   panStart(e) {
     this.width = this._main.clientWidth;
-    this.updateAnimationState(e.totalX);
+    this.updateAnimationState(e.get('totalX'));
   },
 
   panEnd(e) {
@@ -132,11 +132,11 @@ export default Component.extend({
   },
 
   panLeft(e) {
-    this.updateAnimationState(e.totalX);
+    this.updateAnimationState(e.get('totalX'));
   },
 
   panRight(e) {
-    this.updateAnimationState(e.totalX);
+    this.updateAnimationState(e.get('totalX'));
   },
 
   transition(isLeft) {
@@ -170,7 +170,7 @@ export default Component.extend({
   },
 
   resolveAnimationState(event) {
-    let dX = event.totalX;
+    let dX = event.get('totalX');
     let { width, transitionAt, duration } = this;
     let percentComplete = dX / width;
     let absCompleted = Math.abs(percentComplete);

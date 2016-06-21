@@ -2,6 +2,24 @@ import Input from './input';
 
 export default class TouchInput extends Input {
 
+  extractPointers(event) {
+    let touches;
+
+    if (event.type === 'touchend') {
+      touches = Array.prototype.slice.call(event.changedTouches, 0);
+    } else {
+      touches = Array.prototype.slice.call(event.touches, 0);
+    }
+
+    return touches.map((touch) => {
+      return {
+        pointerId: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY
+      }
+    });
+  }
+
   attach() {
     if (this.attached) {
       return;

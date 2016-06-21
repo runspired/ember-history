@@ -5,7 +5,8 @@ export default class Input {
 
   constructor(element, manager) {
     this.element = element;
-    this.streams = [];
+    this.activePointers = 0;
+    this.stream = null;
     this.attached = false;
     this.handler = null;
     this.handlerStack = [];
@@ -26,59 +27,49 @@ export default class Input {
   }
 
   start(event) {
-    let stream = Stream.create();
-    const { streams } = this;
-
-    // splice existing streams
-    for (let i = 0; i < streams.length; i++) {
-      // console.log('splitting existing stream');
-      streams[i].split();
+    if (this.stream === null) {
+      this.stream = Stream.create();
+    } else {
+      this.stream.split();
     }
 
+    this.activePointers++;
     this.streaming = true;
 
-    streams.push(stream);
+    const pointers = this.extractPointers(event);
+
     // console.log('opening new stream');
-    let streamEvent = stream.open({
-      x: event.clientX || event.pageX,
-      y: event.clientY || event.pageY,
-      event
-    });
+    let streamEvent = this.stream.open({ event, pointers });
 
     if (this.handler) {
       this.handlerStack.push(this.handler);
       this.handler = null;
     }
 
-    this.manager.recognize(this, streams, streamEvent);
+    this.manager.recognize(this, this.stream, streamEvent);
 
     this._poll();
   }
 
   trigger(streamEvent) {
     if (this.handler) {
-      this.handler.recognize(this, this.streams, streamEvent);
+      this.handler.recognize(this, this.stream, streamEvent);
     } else {
-      this.manager.recognize(this, this.streams, streamEvent);
+      this.manager.recognize(this, this.stream, streamEvent);
     }
   }
 
   _update(event) {
     // console.log('updating');
-    let { streams } = this;
-    let [stream] = streams;
     let streamEvent;
+    const pointers = this.extractPointers(event);
 
     if (!this.streaming) {
       if (!this.handler) {
 
       }
       // console.log('closing stream');
-      streamEvent = stream.close({
-        x: event.clientX || event.pageX,
-        y: event.clientY || event.pageY,
-        event
-      });
+      streamEvent = this.stream.close({ event, pointers });
 
       this.hasMoved = false;
       this.trigger(streamEvent);
@@ -89,18 +80,14 @@ export default class Input {
 
       // vacate this stream
       // console.log('removing stream');
-      streams.pop();
+      this.stream = null;
 
-      if (wasRecognizing && !streams.length) {
+      if (wasRecognizing && !this.stream) {
         this.manager.endInputRecognition();
       }
 
     } else {
-      streamEvent = stream.push({
-        x: event.clientX || event.pageX,
-        y: event.clientY || event.pageY,
-        event
-      });
+      streamEvent = this.stream.push({ event, pointers });
 
       this.trigger(streamEvent);
     }
@@ -137,7 +124,15 @@ export default class Input {
   _close(event) {
     if (this.streaming) {
       // console.log('received close event');
-      this.streaming = false;
+      this.activePointers--;
+
+
+      if (this.activePointers !== 0) {
+        this.stream.split();
+      } else {
+        this.streaming = false;
+      }
+
       this._nextEvent = event;
     }
   }
@@ -166,7 +161,7 @@ export default class Input {
     this.deattach();
     this.manager = null;
     this.element = null;
-    this.streams = null;
+    this.stream = null;
     this.handler = null;
   }
 

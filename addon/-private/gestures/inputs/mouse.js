@@ -3,6 +3,14 @@ import SUPPORTS_PASSIVE from '../utils/supports-passive';
 
 export default class MouseInput extends Input {
 
+  extractPointers(event) {
+    return [{
+      pointerId: 'mousePointer',
+      x: event.clientX,
+      y: event.clientY
+    }];
+  }
+
   attach() {
     if (this.attached) {
       return;
