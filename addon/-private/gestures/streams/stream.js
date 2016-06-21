@@ -13,6 +13,7 @@ export default class Stream {
 
   init() {
     this.segments = new FastArray(5, 'Segments');
+    this.pointerCount = 0;
     this.series = undefined;
     this._isDestroyed = false;
     this._isDestroying = false;

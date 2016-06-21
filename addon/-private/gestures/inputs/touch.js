@@ -2,16 +2,34 @@ import Input from './input';
 
 export default class TouchInput extends Input {
 
+  extractPointers(event) {
+    let touches;
+
+    if (event.type === 'touchend') {
+      touches = Array.prototype.slice.call(event.changedTouches, 0);
+    } else {
+      touches = Array.prototype.slice.call(event.touches, 0);
+    }
+
+    return touches.map((touch) => {
+      return {
+        pointerId: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY
+      }
+    });
+  }
+
   attach() {
     if (this.attached) {
       return;
     }
     const { element } = this;
 
-    element.addEventListener('mousedown', this._bind('start') , true);
-    element.addEventListener('mouseup', this._bind('end') , true);
-    element.addEventListener('mouseexit', this._bind('interrupt') , true);
-    element.addEventListener('mousemove', this._bind('update') , true);
+    element.addEventListener('touchstart', this._bind('start') , true);
+    element.addEventListener('touchend', this._bind('end') , true);
+    element.addEventListener('touchcancel', this._bind('interrupt') , true);
+    element.addEventListener('touchmove', this._bind('update') , true);
 
     this.attached = true;
   }
@@ -22,10 +40,10 @@ export default class TouchInput extends Input {
     }
     const { element, _handlers } = this;
 
-    element.removeEventListener('mousedown', _handlers.start , true);
-    element.removeEventListener('mouseup', _handlers.end , true);
-    element.removeEventListener('mouseexit', _handlers.interrupt , true);
-    element.removeEventListener('mousemove', _handlers.update , true);
+    element.removeEventListener('touchstart', _handlers.start , true);
+    element.removeEventListener('touchend', _handlers.end , true);
+    element.removeEventListener('touchcancel', _handlers.interrupt , true);
+    element.removeEventListener('touchmove', _handlers.update , true);
   }
 
 }

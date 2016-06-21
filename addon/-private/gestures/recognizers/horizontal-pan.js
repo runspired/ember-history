@@ -9,10 +9,10 @@ export default class HorizontalPan {
     this.isRecognizing = false;
   }
 
-  beginRecognizing(input, streams, streamEvent) {
+  beginRecognizing(input, stream, streamEvent) {
     this.isRecognizing = true;
 
-    this.stream = streams[streams.length - 1];
+    this.stream = stream;
     let { series } = this.stream;
 
     series.forEach((event) => {
@@ -29,7 +29,7 @@ export default class HorizontalPan {
       this.layer.emit({ name: 'panEnd', event });
       this.stream = undefined;
 
-    } else if (event.totalX < 0 || event.prev.totalX < 0) {
+    } else if (event.totalX < 0 || event.prev.get('totalX') < 0) {
       this.layer.emit({ name: 'panLeft', event });
 
     } else {
@@ -41,11 +41,11 @@ export default class HorizontalPan {
     this.layer.emit({ name, event });
   }
 
-  recognize(input, streams, streamEvent) {
+  recognize(input, stream, streamEvent) {
     if (this.isRecognizing) {
       this.relay(streamEvent);
-    } else if (streamEvent.totalY === 0 && streamEvent.totalX !== 0) {
-      this.beginRecognizing(input, streams, streamEvent);
+    } else if (input.activePointers === 1 && streamEvent.get('totalY') === 0 && streamEvent.get('totalX') !== 0) {
+      this.beginRecognizing(input, stream, streamEvent);
     }
 
     return this.isRecognizing;
