@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import Manager from 'history/-private/gestures/manager';
+import { Manager } from 'hammerjs';
 
 const {
   Service

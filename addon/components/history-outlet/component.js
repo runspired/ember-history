@@ -1,11 +1,12 @@
 /* global Linear */
 import Ember from 'ember';
 import layout from './template';
-import Layer from 'history/-private/gestures/layer';
-import HorizontalPan from 'history/-private/gestures/recognizers/horizontal-pan';
+
 import Animation from 'history/-private/animation';
 import removeRange from 'history/utils/dom/remove-range';
 import appendRange from 'history/utils/dom/append-range';
+
+import { Layer, HorizontalPanRecognizer as HorizontalPan } from 'hammerjs';
 
 const {
   inject,
