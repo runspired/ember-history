@@ -53,17 +53,16 @@ export default Component.extend({
   _isTransitioning: false,
 
   currentRouteName: '',
-  activeRouteName: computed.alias('history.currentRouteName'),
 
-  canGoBack: computed('history.stack.lastObject', function() {
-    let last = this.get('history.stack.lastObject');
+  canGoBack: computed('history.previous', function() {
+    let last = this.get('history.previous');
     let routeName = this.get('currentRouteName');
 
     return !!last && last.routeName.indexOf(routeName) === 0;
   }),
 
-  canGoForward: computed('history.seen.lastObject', function() {
-    let next = this.get('history.seen.lastObject');
+  canGoForward: computed('history.next', function() {
+    let next = this.get('history.next');
     let routeName = this.get('currentRouteName');
 
     return !!next && next.routeName.indexOf(routeName) === 0;
@@ -118,8 +117,8 @@ export default Component.extend({
         low: low.fps
       });
 
-      this._fpsMeter()
-    })
+      this._fpsMeter();
+    });
   },
 
 
@@ -245,18 +244,12 @@ export default Component.extend({
       });
   },
 
-  _finishTransition(nextState) {
-    let previous = this.domFor(nextState.previous, 'previous');
-    let next = this.domFor(nextState.next, 'next');
-
-    this._left.innerHTML = '';
-    this._right.innerHTML = '';
-
+  _finishTransition({ previous, next }) {
     if (previous) {
-      appendRange(this._left, previous.firstChild, previous.lastChild);
+      this.get('history').restoreFromCache(previous.url, this._left);
     }
     if (next) {
-      appendRange(this._right, next.firstChild, next.lastChild);
+      this.get('history').restoreFromCache(next.url, this._right);
     }
   },
 
@@ -300,10 +293,14 @@ export default Component.extend({
     this._main = this.element.children[1];
     this._right = this.element.children[2];
     this._outlet = this.element.children[3];
+
+    this.get('history').activate(this, this._outlet, this.get('name'));
   },
 
   willDestroyElement() {
     this._super();
+    this.get('history').deactivate();
+
     this._left = undefined;
     this._main = undefined;
     this._right = undefined;

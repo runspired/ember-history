@@ -1,8 +1,7 @@
 import Ember from 'ember';
-import cloneRange from 'history/utils/dom/clone-range';
+import HistoryStack from '../models/history-stack';
 
 const {
-  A,
   computed,
   inject,
   Service,
@@ -13,38 +12,63 @@ const {
   Promise // jshint ignore:line
   } = Ember.RSVP;
 
-const UNKNOWN_SEGMENT = false;
-let STACK_ID = 0;
-
 export default Service.extend(Evented, {
   routing: inject.service('-routing'),
   router: computed.alias('routing.router'),
 
-  cache: undefined,
-  stack: undefined,
-  seen: undefined,
-  _isHistoryOperation: false,
-  _nextState: undefined,
+  cache: inject.service('history-cache'),
 
-  previous: computed.alias('stack.lastObject'),
-  next: computed.alias('seen.lastObject'),
-  current: undefined,
+  activeOutletName: undefined,
+  activeOutlet: undefined,
+  activeStack: undefined,
+  stacks: undefined,
+
+  _isHistoryOperation: false,
+
+  previous: computed.alias('activeStack.previous'),
+  next: computed.alias('activeStack.next'),
+  current: computed.alias('activeStack.current'),
+
+  activate(outletName, outletElement, name = 'default') {
+    Ember.assert(`Only one history-outlet can be active at once, tried to activate ${name} while ${this.get('activeOutletName')} was already active`, !this.get('activeOutletName'));
+
+    let stacks = this.get('stacks');
+    let historyStack = stacks.get(name);
+
+    if (historyStack === undefined) {
+      let router = this.get('router');
+      let location = router.get('_location') || router.get('location');
+      let url = location.lastSetURL || router.get('url');
+      let routeName = router.currentRouteName;
+      let current = { url, routeName };
+
+      historyStack = HistoryStack.create({ current });
+
+      stacks.set(name, historyStack);
+    }
+
+    this.set('activeStack', historyStack);
+    this.set('activeOutletElement', outletElement);
+    this.set('activeOutletName', outletName);
+  },
+
+  deactivate() {
+    this.set('activeStack', undefined);
+    this.set('activeOutlet', undefined);
+    this.set('activeOutletName', undefined);
+  },
 
   back() {
-    let t = this.get('stack').get('lastObject');
-    let r = this.get('current');
+    let previous = this.get('previous');
 
-    if (t) {
-      this._isHistoryOperation = !0;
-      this._nextState = {
-        next: r,
-        current: t,
-        previous: undefined
-      };
+    if (previous) {
+      this._isHistoryOperation = true;
 
-      return this.get('router').transitionTo(t.url)
+      return this.get('router').transitionTo(previous.url)
+        .then(() => {
+          this.get('activeStack').back();
+        })
         .finally(() => {
-          this._nextState = undefined;
           this._isHistoryOperation = false;
         });
     }
@@ -53,20 +77,16 @@ export default Service.extend(Evented, {
   },
 
   forward() {
-    let t = this.get('seen.lastObject');
-    let r = this.get('current');
+    let next = this.get('next');
 
-    if (t) {
+    if (next) {
       this._isHistoryOperation = true;
-      this._nextState = {
-        previous: r,
-        current: t,
-        next: undefined
-      };
 
-      return this.get('router').transitionTo(t.url)
+      return this.get('router').transitionTo(next.url)
+        .then(() => {
+          this.get('activeStack').forward();
+        })
         .finally(() => {
-          this._nextState = undefined;
           this._isHistoryOperation = false;
         });
     }
@@ -74,145 +94,42 @@ export default Service.extend(Evented, {
     return Promise.reject('no forward history present');
   },
 
-  segmentFor(outletName, stackItem) {
-    if (!stackItem) {
-      return UNKNOWN_SEGMENT;
-    }
+  restoreFromCache(url, element) {
+    let outletName = this.get('activeOutletName');
 
-    const cache = this.get('cache');
-    let data = cache.get(stackItem.url);
-
-    if (!data || !data.segments) {
-      return UNKNOWN_SEGMENT;
-    }
-
-    let segment = data.segments.get(`${outletName}-main`);
-
-    return segment ? segment.child || segment : UNKNOWN_SEGMENT;
-  },
-
-  updateCache(url, data) {
-    const cache = this.get('cache');
-
-    let stale = cache.get(url);
-
-    if (stale) {
-      stale.segments.forEach((segment) => {
-        segment.dom = null;
-        segment.parent = null;
-        segment.child = null;
-      });
-    }
-
-    this.get('cache').set(url, data);
-  },
-
-  actions: {
-
-    back() {
-      return this.back();
-    },
-
-    forward() {
-      return this.forward();
-    }
-
+    this.get('cache').restore(url, outletName, element);
   },
 
   init() {
-    function walkOutlets(outlets) {
-      let segments = new Map();
-      let lastStackItemSeen = null;
-
-      outlets.forEach(function(outletMorph) {
-        let handler = outletMorph._state.outletState.render;
-        let key = `${handler.name}-${handler.outlet}`;
-        let segment = {
-            name: handler.name,
-            outlet: handler.outlet,
-            key: key,
-            dom: cloneOutlet(outletMorph),
-            parent: lastStackItemSeen,
-            child: null
-          };
-
-        if (lastStackItemSeen) {
-          lastStackItemSeen.child = segment;
-        }
-
-        lastStackItemSeen = segment;
-        segments.set(key, segment);
-
-      });
-
-      return segments;
-    }
-
-    function cloneOutlet(element) {
-      let outletElement = cloneRange('outlet-segment', element.firstNode, element.lastNode);
-
-      outletElement.id = STACK_ID++;
-      return outletElement;
-    }
-
     this._super();
 
-    this.set('stack', new A([]));
-    this.set('cache', new Map());
-    this.set('seen', new A([]));
+    this.set('stacks', Ember.Object.create());
 
     const router = this.get('router');
 
     router.on('willTransition', () => {
-      let currentStackItem = this.get('current');
+      let outletName = this.get('activeOutletName');
+      let outletElement = this.get('activeOutletElement');
+      let current = this.get('current');
 
-      if (currentStackItem) {
-        let segments = walkOutlets(router._toplevelView._outlets);
-        this.updateCache(currentStackItem.url, { segments });
+      if (current) {
+        this.get('cache').update(current.url, outletName, outletElement);
       }
     });
 
     router.on('didTransition', () => {
-      if (this._isHistoryOperation) {
-        let nextState = this._nextState;
-
-        if (nextState.previous) {
-          this.get('seen').popObject();
-          this.set('current', nextState.current);
-          this.get('stack').pushObject(nextState.previous);
-        } else {
-          this.get('stack').popObject();
-          this.set('current', nextState.current);
-          this.get('seen').pushObject(nextState.next);
-        }
-
-        this.trigger(
-          'didTransition',
-          this.getProperties('previous', 'next', 'current')
-        );
-
-      } else {
+      if (!this._isHistoryOperation) {
         let location = router.get('_location') || router.get('location');
         let url = location.lastSetURL || router.get('url');
-        let previousStackItem = this.get('current');
-        let currentStackItem = {
-          url,
-          routeName: router.currentRouteName
-        };
+        let routeName = router.currentRouteName;
 
-        this.set('current', currentStackItem);
-        this.get('seen').clear();
-
-        if (previousStackItem) {
-          this.get('stack').pushObject(previousStackItem);
-        }
-
-        this.trigger('didTransition', {
-          previous: previousStackItem,
-          current: currentStackItem,
-          next: undefined
-        });
+        this.get('activeStack').push({ url, routeName });
       }
+
+      this.trigger(
+        'didTransition',
+        this.getProperties('previous', 'current', 'next')
+      );
     });
   }
 });
